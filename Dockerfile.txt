@@ -1,0 +1,45 @@
+# Use a Python base image to create the executable
+FROM python:3.12.1 as builder
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the requirements file and install dependencies
+COPY requirements.txt.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install PyInstaller
+RUN pip install pyinstaller
+
+# Copy the application files
+COPY . /app
+
+# Rename the script for easier handling (avoid spaces in filenames)
+RUN mv "Sleep Detection Model.py" sleep_detection_model.py
+
+# Create the binary executable
+RUN pyinstaller --onefile sleep_detection_model.py
+
+# Use a slimmer Python image for the final stage
+FROM python:3.12-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Install necessary dependencies for running the executable
+RUN apt-get update && apt-get install -y libgl1-mesa-glx
+
+# Copy the executable from the builder stage
+COPY --from=builder /app/dist/sleep_detection_model /app/
+
+# Copy the models directory
+COPY models /app/models
+
+# Ensure the binary has execution permissions
+RUN chmod +x /app/sleep_detection_model
+
+# Set the entry point to the binary executable
+ENTRYPOINT ["/app/sleep_detection_model"]
+
+# Default command to run the application
+CMD ["--help"]
